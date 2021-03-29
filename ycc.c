@@ -18,6 +18,7 @@ struct Token {
 	Token *next;
 	int val;
 	char *str;
+	int len;
 };
 
 Token *token;
@@ -69,16 +70,20 @@ void error_at(char *loc, char *fmt, ...) {
 	exit(1);
 }
 
-bool consume(char op) {
-	if (token->kind != TK_RESERVED || token->str[0] != op)
+bool consume(char *op) {
+	if (token->kind != TK_RESERVED || 
+		strlen(op) != token->len ||
+		memcmp(token->str, op, token->len))
 		return false;
 	token = token->next;
 	return true;
 }
 
-void expect(char op) {
-	if (token->kind != TK_RESERVED || token->str[0] != op)
-		error_at(token->str, "expected '%c'", op);
+void expect(char *op) {
+	if (token->kind != TK_RESERVED ||
+		strlen(op) != token->len ||
+		memcmp(token->str, op, token->len))
+		error_at(token->str, "expected '%s'", op);
 	token = token->next;
 }
 
@@ -113,8 +118,22 @@ Token *tokenize(char *p) {
 			continue;
 		}
 
+		if (strncmp(p, "<=", 2) == 0 || strncmp(p, "<=", 2) == 0 || strncmp(p, "==", 2) == 0 || strncmp(p, "!=", 2) == 0) {
+			cur = new_token(TK_RESERVED, cur, p);
+			p += 2;
+			cur->len = 2;
+			continue;
+		}
+
+		if (*p == '<' || *p == '>') {
+			cur = new_token(TK_RESERVED, cur, p++);
+			cur->len = 1;
+			continue;
+		}
+
 		if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')') {
 			cur = new_token(TK_RESERVED, cur, p++);
+			cur->len = 1;
 			continue;
 		}
 
@@ -134,18 +153,18 @@ Token *tokenize(char *p) {
 Node *expr();
 
 Node *primary() {
-	if (consume('(')) {
+	if (consume("(")) {
 		Node *node = expr();
-		expect(')');
+		expect(")");
 		return node;
 	}
 	return new_node_num(expect_number());
 }
 
 Node *unary() {
-	if (consume('+'))
+	if (consume("+"))
 		return primary();
-	if (consume('-'))
+	if (consume("-"))
 		return new_node(ND_SUB, new_node_num(0), primary());
 	return primary();
 }
@@ -154,9 +173,9 @@ Node *mul() {
 	Node *node = unary();
 
 	for (;;) {
-		if (consume('*'))
+		if (consume("*"))
 			node = new_node(ND_MUL, node, unary());
-		else if (consume('/'))
+		else if (consume("/"))
 			node = new_node(ND_DIV, node, unary());
 		else return node;
 	}
@@ -166,9 +185,9 @@ Node *expr() {
 	Node *node = mul();
 
 	for (;;) {
-		if (consume('+'))
+		if (consume("+"))
 			node = new_node(ND_ADD, node, mul());
-		else if (consume('-'))
+		else if (consume("-"))
 			node = new_node(ND_SUB, node, mul());
 		else
 			return node;
