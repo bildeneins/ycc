@@ -24,6 +24,10 @@ struct Token {
 Token *token;
 
 typedef enum {
+	ND_EQ,
+	ND_NEQ,
+	ND_LT,
+	ND_LTEQ,
 	ND_ADD,
 	ND_SUB,
 	ND_MUL,
@@ -118,7 +122,7 @@ Token *tokenize(char *p) {
 			continue;
 		}
 
-		if (strncmp(p, "<=", 2) == 0 || strncmp(p, "<=", 2) == 0 || strncmp(p, "==", 2) == 0 || strncmp(p, "!=", 2) == 0) {
+		if (strncmp(p, "<=", 2) == 0 || strncmp(p, ">=", 2) == 0 || strncmp(p, "==", 2) == 0 || strncmp(p, "!=", 2) == 0) {
 			cur = new_token(TK_RESERVED, cur, p);
 			p += 2;
 			cur->len = 2;
@@ -181,7 +185,7 @@ Node *mul() {
 	}
 }
 
-Node *expr() {
+Node *add() {
 	Node *node = mul();
 
 	for (;;) {
@@ -192,6 +196,40 @@ Node *expr() {
 		else
 			return node;
 	}
+}
+
+Node *relational() {
+	Node *node = add();
+	
+	for (;;) {
+		if (consume("<"))
+			node = new_node(ND_LT, node, add());
+		else if (consume(">"))
+			node = new_node(ND_LT, add(), node);
+		else if (consume("<="))
+			node = new_node(ND_LTEQ, node, add());
+		else if (consume(">="))
+			node = new_node(ND_LTEQ, add(), node);
+		else
+			return node;
+	}
+}
+
+Node *equality() {
+	Node *node = relational();
+
+	for (;;) {
+		if (consume("=="))
+			node = new_node(ND_EQ, node, relational());
+		else if (consume("!="))
+			node = new_node(ND_NEQ, node, relational());
+		else
+			return node;
+	}
+}
+
+Node *expr() {
+	return equality();
 }
 
 void gen(Node *node) {
@@ -219,6 +257,26 @@ void gen(Node *node) {
 		case ND_DIV:
 			printf("  cqo\n");
 			printf("  idiv rdi\n");
+			break;
+		case ND_EQ:
+			printf("  cmp rax, rdi\n");
+			printf("  sete al\n");
+			printf("  movzb rax, al\n");
+			break;
+		case ND_NEQ:
+			printf("  cmp rax, rdi\n");
+			printf("  setne al\n");
+			printf("  movzb rax, al\n");
+			break;
+		case ND_LT:
+			printf("  cmp rax, rdi\n");
+			printf("  setl al\n");
+			printf("  movzb rax, al\n");
+			break;
+		case ND_LTEQ:
+			printf("  cmp rax, rdi\n");
+			printf("  setle al\n");
+			printf("  movzb rax, al\n");
 			break;
 	}
 
