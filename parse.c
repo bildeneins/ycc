@@ -2,6 +2,7 @@
 
 char *user_input;
 Token *token;
+Node *code[100];
 
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
 	Node *node = calloc(1, sizeof(Node));
@@ -19,6 +20,15 @@ Node *new_node_num(int val) {
 }
 
 char *user_input;
+
+void error(char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, "\n");
+	exit(1);
+}
 
 void error_at(char *loc, char *fmt, ...) {
 	va_list ap;
@@ -40,6 +50,15 @@ bool consume(char *op) {
 		return false;
 	token = token->next;
 	return true;
+}
+
+Token *consume_ident() {
+    Token *tok = NULL;
+    if (token->kind == TK_IDENT) {
+        tok = token;
+        token = token->next;
+    }
+    return tok;
 }
 
 void expect(char *op) {
@@ -69,8 +88,8 @@ Token *new_token(TokenKind kind, Token *cur, char *str) {
 	cur->next = tok;
 	return tok;
 }
-
-Token *tokenize(char *p) {
+void tokenize() {
+    char *p = user_input;
 	Token head;
 	head.next = NULL;
 	Token *cur = &head;
@@ -88,13 +107,13 @@ Token *tokenize(char *p) {
 			continue;
 		}
 
-		if (*p == '<' || *p == '>') {
+		if (*p == '<' || *p == '>' ||  *p == '=') {
 			cur = new_token(TK_RESERVED, cur, p++);
 			cur->len = 1;
 			continue;
 		}
 
-		if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')') {
+		if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')' || *p == ';') {
 			cur = new_token(TK_RESERVED, cur, p++);
 			cur->len = 1;
 			continue;
@@ -106,11 +125,17 @@ Token *tokenize(char *p) {
 			continue;
 		}
 
+        if ('a' <= *p && *p <= 'z') {
+            cur = new_token(TK_IDENT, cur, p++);
+            cur->len = 1;
+            continue;
+        }
+
 		error_at(p, "cannot tokenize");
 	}
 
 	new_token(TK_EOF, cur, p);
-	return head.next;
+	token = head.next;
 }
 
 Node *primary() {
@@ -119,6 +144,14 @@ Node *primary() {
 		expect(")");
 		return node;
 	}
+    Token *tok = consume_ident();
+    if (tok) {
+        Node *node = calloc(1, sizeof(Token));
+        node->kind = ND_LVAR;
+        node->offset = (tok->str[0] - 'a' + 1) * 8;
+        return node;
+    }
+
 	return new_node_num(expect_number());
 }
 
@@ -185,6 +218,31 @@ Node *equality() {
 	}
 }
 
+Node *assign() {
+    Node *node = equality();
+
+    if (consume("=")) {
+        node = new_node(ND_ASSIGN, node, assign());
+    }
+
+    return node;
+};
+
 Node *expr() {
-	return equality();
+	return assign();
 }
+
+Node *stmt() {
+    Node *node = expr();
+    expect(";");
+    return node;
+};
+
+void program() {
+    int i = 0;
+    while (!at_eof()) {
+        code[i++] = stmt();
+    }
+        
+    code[i] = NULL;
+};
