@@ -60,6 +60,13 @@ bool consume(char *op) {
 	return true;
 }
 
+bool consume_token(TokenKind kind) {
+	if (token->kind != kind)
+		return false;
+	token = token->next;
+	return true;
+}
+
 Token *consume_ident() {
     Token *tok = NULL;
     if (token->kind == TK_IDENT) {
@@ -96,6 +103,14 @@ Token *new_token(TokenKind kind, Token *cur, char *str) {
 	cur->next = tok;
 	return tok;
 }
+
+int is_alnum(char c) {
+    return ('a' <= c && c <= 'z') ||
+           ('A' <= c && c <= 'Z') ||
+           ('0' <= c && c <= '9') ||
+           (c == '_');
+}
+
 void tokenize() {
     char *p = user_input;
 	Token head;
@@ -107,6 +122,12 @@ void tokenize() {
 			p++;
 			continue;
 		}
+
+        if (strncmp(p, "return", 6) == 0 && !is_alnum(p[6])) {
+            cur = new_token(TK_RETURN, cur, p);
+            p += 6;
+            continue;
+        }
 
 		if (strncmp(p, "<=", 2) == 0 || strncmp(p, ">=", 2) == 0 || strncmp(p, "==", 2) == 0 || strncmp(p, "!=", 2) == 0) {
 			cur = new_token(TK_RESERVED, cur, p);
@@ -137,7 +158,7 @@ void tokenize() {
             char *st = p;
             int count = 1;
             p++;
-            while ('a' <= *p && *p <= 'z') {
+            while (is_alnum(*p)) {
                 count++;
                 p++;
             }
@@ -268,7 +289,15 @@ Node *expr() {
 }
 
 Node *stmt() {
-    Node *node = expr();
+    Node *node;
+    if (consume_token(TK_RETURN)) {
+        node = calloc(1, sizeof(Node));
+        node->kind = ND_RETURN;
+        node->lhs = expr();
+    } else {
+        node = expr();
+    }
+    
     expect(";");
     return node;
 };

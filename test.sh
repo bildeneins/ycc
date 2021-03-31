@@ -33,5 +33,6 @@ assert 1 "1 + 1 >= 2;"
 assert 1 "a = 1;"
 assert 4 "a = 1; b = 2; c = a * 2 + b; c;"
 assert 6 "ya = 2; so = 3; ya * so;"
+assert 2 "return 2; 1;"
 
 echo OK
